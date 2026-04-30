@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plugin API Reference</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    font-family: -apple-system, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 24px;
+  }
+  h1 { color: #569cd6; font-size: 24px; margin-bottom: 8px; }
+  h2 { color: #4ec9b0; font-size: 18px; margin: 28px 0 10px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+  h3 { color: #dcdcaa; font-size: 15px; margin: 18px 0 6px; }
+  p { margin-bottom: 10px; color: #ccc; }
+  code {
+    background: #2d2d2d;
+    color: #ce9178;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 13px;
+  }
+  pre {
+    background: #252526;
+    border: 1px solid #3c3c3c;
+    border-radius: 6px;
+    padding: 16px;
+    overflow-x: auto;
+    margin: 10px 0 16px;
+  }
+  pre code {
+    background: none;
+    color: #d4d4d4;
+    padding: 0;
+    font-size: 13px;
+  }
+  .keyword { color: #569cd6; }
+  .string { color: #ce9178; }
+  .comment { color: #6a9955; }
+  .func { color: #dcdcaa; }
+  .type { color: #4ec9b0; }
+  .badge {
+    display: inline-block;
+    background: #007acc;
+    color: #fff;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .badge.optional { background: #5a5a5a; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; }
+  th { background: #252526; color: #569cd6; text-align: left; padding: 8px 12px; border: 1px solid #3c3c3c; }
+  td { padding: 8px 12px; border: 1px solid #3c3c3c; color: #ccc; }
+  tr:nth-child(even) td { background: #252526; }
+  .toc { background: #252526; border: 1px solid #3c3c3c; border-radius: 6px; padding: 16px 20px; margin-bottom: 28px; }
+  .toc a { color: #4fc1ff; text-decoration: none; display: block; padding: 2px 0; }
+  .toc a:hover { color: #fff; }
+  .note { background: #1a3a4a; border-left: 3px solid #007acc; padding: 10px 14px; border-radius: 0 4px 4px 0; margin: 10px 0; }
+  .warn { background: #3a2a1a; border-left: 3px solid #ce9178; padding: 10px 14px; border-radius: 0 4px 4px 0; margin: 10px 0; }
+</style>
+</head>
+<body>
+
+<h1>VSCode Android — Plugin API Reference</h1>
+<p>Build powerful plugins for VSCode Android using the JavaScript Plugin API.</p>
+
+<div class="toc">
+  <strong style="color:#4ec9b0">Table of Contents</strong>
+  <a href="#quickstart">Quick Start</a>
+  <a href="#register">VscodePlugin.register()</a>
+  <a href="#ctx-editor">ctx.editor — Editor API</a>
+  <a href="#ctx-ui">ctx.ui — UI API</a>
+  <a href="#ctx-hooks">ctx.hooks — Lifecycle Hooks</a>
+  <a href="#ctx-storage">ctx.storage — Persistent Storage</a>
+  <a href="#ctx-http">ctx.http — HTTP Requests</a>
+  <a href="#examples">Full Examples</a>
+  <a href="#publishing">Publishing to Marketplace</a>
+</div>
+
+<h2 id="quickstart">Quick Start</h2>
+<p>A plugin is a single JavaScript file that calls <code>VscodePlugin.register()</code>. It runs inside the Monaco Editor WebView.</p>
+
+<pre><code><span class="type">VscodePlugin</span>.<span class="func">register</span>({
+  <span class="string">id</span>: <span class="string">'my-plugin'</span>,
+  <span class="string">name</span>: <span class="string">'My Plugin'</span>,
+  <span class="string">version</span>: <span class="string">'1.0.0'</span>,
+  <span class="string">description</span>: <span class="string">'Does something awesome'</span>,
+  <span class="string">author</span>: <span class="string">'Your Name'</span>,
+
+  <span class="func">activate</span>(<span class="type">ctx</span>) {
+    <span class="comment">// Plugin is ready — ctx gives you access to all APIs</span>
+    ctx.ui.<span class="func">showMessage</span>(<span class="string">'Hello from My Plugin!'</span>);
+  },
+
+  <span class="func">deactivate</span>() {
+    <span class="comment">// Cleanup when plugin is removed</span>
+  }
+});</code></pre>
+
+<h2 id="register">VscodePlugin.register(manifest)</h2>
+<p>Registers your plugin with the runtime. Must be called at the top level of your plugin file.</p>
+
+<table>
+  <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>id</code></td><td>string</td><td>Unique plugin identifier (kebab-case)</td></tr>
+  <tr><td><code>name</code></td><td>string</td><td>Display name shown in marketplace</td></tr>
+  <tr><td><code>version</code></td><td>string</td><td>Semantic version (e.g. <code>1.0.0</code>)</td></tr>
+  <tr><td><code>description</code></td><td>string</td><td>Short description</td></tr>
+  <tr><td><code>author</code></td><td>string</td><td>Author name or GitHub handle</td></tr>
+  <tr><td><code>activate(ctx)</code></td><td>function</td><td>Called when plugin loads — main entry point</td></tr>
+  <tr><td><code>deactivate()</code></td><td>function <span class="badge optional">optional</span></td><td>Called when plugin is removed</td></tr>
+</table>
+
+<h2 id="ctx-editor">ctx.editor — Editor API</h2>
+<p>Interact with the Monaco Editor instance.</p>
+
+<h3>ctx.editor.getText()</h3>
+<p>Returns the full content of the current file as a string.</p>
+<pre><code><span class="keyword">const</span> content = ctx.editor.<span class="func">getText</span>();
+console.<span class="func">log</span>(content);</code></pre>
+
+<h3>ctx.editor.setText(text)</h3>
+<p>Replaces the entire editor content.</p>
+<pre><code>ctx.editor.<span class="func">setText</span>(<span class="string">'// New content\nconsole.log("hello")'</span>);</code></pre>
+
+<h3>ctx.editor.getSelection()</h3>
+<p>Returns the currently selected text, or empty string if nothing is selected.</p>
+<pre><code><span class="keyword">const</span> selected = ctx.editor.<span class="func">getSelection</span>();</code></pre>
+
+<h3>ctx.editor.insertText(text)</h3>
+<p>Inserts text at the current cursor position, replacing any selection.</p>
+<pre><code>ctx.editor.<span class="func">insertText</span>(<span class="string">'// inserted comment\n'</span>);</code></pre>
+
+<h3>ctx.editor.getCursorPosition()</h3>
+<p>Returns <code>{ line, column }</code> of the current cursor.</p>
+<pre><code><span class="keyword">const</span> pos = ctx.editor.<span class="func">getCursorPosition</span>();
+console.<span class="func">log</span>(<span class="string">`Line: <span class="keyword">${</span>pos.line<span class="keyword">}</span>, Col: <span class="keyword">${</span>pos.column<span class="keyword">}</span>`</span>);</code></pre>
+
+<h3>ctx.editor.getLanguage()</h3>
+<p>Returns the current language ID (e.g. <code>"javascript"</code>, <code>"python"</code>, <code>"dart"</code>).</p>
+<pre><code><span class="keyword">const</span> lang = ctx.editor.<span class="func">getLanguage</span>();</code></pre>
+
+<h3>ctx.editor.setLanguage(languageId)</h3>
+<p>Changes the syntax highlighting language.</p>
+<pre><code>ctx.editor.<span class="func">setLanguage</span>(<span class="string">'typescript'</span>);</code></pre>
+
+<h3>ctx.editor.formatDocument()</h3>
+<p>Triggers Monaco's built-in document formatter.</p>
+<pre><code>ctx.editor.<span class="func">formatDocument</span>();</code></pre>
+
+<h3>ctx.editor.addAction(action)</h3>
+<p>Adds a custom command to the editor's command palette.</p>
+<pre><code>ctx.editor.<span class="func">addAction</span>({
+  id: <span class="string">'my-plugin.hello'</span>,
+  label: <span class="string">'My Plugin: Say Hello'</span>,
+  keybindings: [], <span class="comment">// optional Monaco keybinding codes</span>
+  <span class="func">run</span>() {
+    ctx.ui.<span class="func">showMessage</span>(<span class="string">'Hello!'</span>);
+  }
+});</code></pre>
+
+<h2 id="ctx-ui">ctx.ui — UI API</h2>
+<p>Show messages and interact with the app UI.</p>
+
+<h3>ctx.ui.showMessage(text)</h3>
+<p>Shows a snackbar notification at the bottom of the screen.</p>
+<pre><code>ctx.ui.<span class="func">showMessage</span>(<span class="string">'File saved!'</span>);</code></pre>
+
+<h3>ctx.ui.showError(text)</h3>
+<p>Shows an error snackbar (red).</p>
+<pre><code>ctx.ui.<span class="func">showError</span>(<span class="string">'Something went wrong'</span>);</code></pre>
+
+<h3>ctx.ui.showInputBox(options)</h3>
+<p>Shows a dialog with a text input. Returns a Promise resolving to the entered string, or <code>null</code> if cancelled.</p>
+<pre><code><span class="keyword">const</span> name = <span class="keyword">await</span> ctx.ui.<span class="func">showInputBox</span>({
+  title: <span class="string">'Enter name'</span>,
+  placeholder: <span class="string">'e.g. MyClass'</span>,
+  value: <span class="string">''</span>
+});
+<span class="keyword">if</span> (name) ctx.editor.<span class="func">insertText</span>(name);</code></pre>
+
+<h3>ctx.ui.showQuickPick(items)</h3>
+<p>Shows a selection dialog. Returns a Promise resolving to the selected item string, or <code>null</code>.</p>
+<pre><code><span class="keyword">const</span> choice = <span class="keyword">await</span> ctx.ui.<span class="func">showQuickPick</span>([
+  <span class="string">'Option A'</span>, <span class="string">'Option B'</span>, <span class="string">'Option C'</span>
+]);
+<span class="keyword">if</span> (choice) ctx.ui.<span class="func">showMessage</span>(<span class="string">`You picked: <span class="keyword">${</span>choice<span class="keyword">}</span>`</span>);</code></pre>
+
+<h2 id="ctx-hooks">ctx.hooks — Lifecycle Hooks</h2>
+<p>React to editor events.</p>
+
+<h3>ctx.hooks.onSave(callback)</h3>
+<p>Called whenever the user saves the current file.</p>
+<pre><code>ctx.hooks.<span class="func">onSave</span>((filePath) => {
+  ctx.ui.<span class="func">showMessage</span>(<span class="string">`Saved: <span class="keyword">${</span>filePath<span class="keyword">}</span>`</span>);
+});</code></pre>
+
+<h3>ctx.hooks.onFileOpen(callback)</h3>
+<p>Called when a new file is opened in the editor.</p>
+<pre><code>ctx.hooks.<span class="func">onFileOpen</span>((filePath) => {
+  console.<span class="func">log</span>(<span class="string">'Opened:'</span>, filePath);
+});</code></pre>
+
+<h3>ctx.hooks.onChange(callback)</h3>
+<p>Called on every content change. Use sparingly — fires on every keystroke.</p>
+<pre><code>ctx.hooks.<span class="func">onChange</span>((content) => {
+  <span class="comment">// content = full editor text after change</span>
+});</code></pre>
+
+<h3>ctx.hooks.onCursorMove(callback)</h3>
+<p>Called when the cursor position changes.</p>
+<pre><code>ctx.hooks.<span class="func">onCursorMove</span>(({ line, column }) => {
+  console.<span class="func">log</span>(line, column);
+});</code></pre>
+
+<h2 id="ctx-storage">ctx.storage — Persistent Storage</h2>
+<p>Key-value storage scoped to your plugin. Data persists across app restarts.</p>
+
+<h3>ctx.storage.get(key)</h3>
+<p>Returns a Promise resolving to the stored value, or <code>null</code> if not set.</p>
+<pre><code><span class="keyword">const</span> token = <span class="keyword">await</span> ctx.storage.<span class="func">get</span>(<span class="string">'api_token'</span>);</code></pre>
+
+<h3>ctx.storage.set(key, value)</h3>
+<p>Stores a string value. Returns a Promise.</p>
+<pre><code><span class="keyword">await</span> ctx.storage.<span class="func">set</span>(<span class="string">'api_token'</span>, <span class="string">'sk-...'</span>);</code></pre>
+
+<h3>ctx.storage.remove(key)</h3>
+<p>Removes a stored key. Returns a Promise.</p>
+<pre><code><span class="keyword">await</span> ctx.storage.<span class="func">remove</span>(<span class="string">'api_token'</span>);</code></pre>
+
+<h2 id="ctx-http">ctx.http — HTTP Requests</h2>
+<p>Make HTTP requests from your plugin. Requests are routed through Tor if the user has it enabled.</p>
+
+<h3>ctx.http.get(url, headers?)</h3>
+<p>Performs a GET request. Returns a Promise resolving to <code>{ status, body }</code>.</p>
+<pre><code><span class="keyword">const</span> res = <span class="keyword">await</span> ctx.http.<span class="func">get</span>(<span class="string">'https://api.example.com/data'</span>);
+<span class="keyword">if</span> (res.status === <span class="string">200</span>) {
+  <span class="keyword">const</span> data = <span class="type">JSON</span>.<span class="func">parse</span>(res.body);
+}</code></pre>
+
+<h3>ctx.http.post(url, body, headers?)</h3>
+<p>Performs a POST request with a JSON body. Returns a Promise resolving to <code>{ status, body }</code>.</p>
+<pre><code><span class="keyword">const</span> res = <span class="keyword">await</span> ctx.http.<span class="func">post</span>(
+  <span class="string">'https://api.example.com/submit'</span>,
+  { key: <span class="string">'value'</span> },
+  { <span class="string">'Authorization'</span>: <span class="string">'Bearer token'</span> }
+);</code></pre>
+
+<div class="note">
+  <strong>Note:</strong> HTTP requests from plugins respect the user's Tor proxy setting. When Tor is enabled, all requests are routed through SOCKS5 on 127.0.0.1:9050 via Orbot.
+</div>
+
+<h2 id="examples">Full Examples</h2>
+
+<h3>Word Counter Plugin</h3>
+<pre><code><span class="type">VscodePlugin</span>.<span class="func">register</span>({
+  id: <span class="string">'word-counter'</span>,
+  name: <span class="string">'Word Counter'</span>,
+  version: <span class="string">'1.0.0'</span>,
+  description: <span class="string">'Shows word count in status bar'</span>,
+  author: <span class="string">'example'</span>,
+
+  <span class="func">activate</span>(ctx) {
+    <span class="keyword">const</span> <span class="func">count</span> = () => {
+      <span class="keyword">const</span> text = ctx.editor.<span class="func">getText</span>();
+      <span class="keyword">const</span> words = text.<span class="func">trim</span>().<span class="func">split</span>(<span class="string">/\s+/</span>).<span class="func">filter</span>(<span class="type">Boolean</span>).length;
+      ctx.ui.<span class="func">showMessage</span>(<span class="string">`Words: <span class="keyword">${</span>words<span class="keyword">}</span>`</span>);
+    };
+
+    ctx.editor.<span class="func">addAction</span>({
+      id: <span class="string">'word-counter.count'</span>,
+      label: <span class="string">'Word Counter: Count Words'</span>,
+      <span class="func">run</span>: count
+    });
+
+    ctx.hooks.<span class="func">onSave</span>(() => <span class="func">count</span>());
+  }
+});</code></pre>
+
+<h3>Auto Header Plugin</h3>
+<pre><code><span class="type">VscodePlugin</span>.<span class="func">register</span>({
+  id: <span class="string">'auto-header'</span>,
+  name: <span class="string">'Auto Header'</span>,
+  version: <span class="string">'1.0.0'</span>,
+  description: <span class="string">'Inserts a file header comment'</span>,
+  author: <span class="string">'example'</span>,
+
+  <span class="func">activate</span>(ctx) {
+    ctx.editor.<span class="func">addAction</span>({
+      id: <span class="string">'auto-header.insert'</span>,
+      label: <span class="string">'Auto Header: Insert Header'</span>,
+      <span class="keyword">async</span> <span class="func">run</span>() {
+        <span class="keyword">const</span> author = <span class="keyword">await</span> ctx.storage.<span class="func">get</span>(<span class="string">'author'</span>) || <span class="string">'Unknown'</span>;
+        <span class="keyword">const</span> date = <span class="keyword">new</span> <span class="type">Date</span>().<span class="func">toISOString</span>().<span class="func">split</span>(<span class="string">'T'</span>)[<span class="string">0</span>];
+        <span class="keyword">const</span> lang = ctx.editor.<span class="func">getLanguage</span>();
+        <span class="keyword">const</span> comment = lang === <span class="string">'python'</span>
+          ? <span class="string">`# Author: <span class="keyword">${</span>author<span class="keyword">}</span>\n# Date: <span class="keyword">${</span>date<span class="keyword">}</span>\n\n`</span>
+          : <span class="string">`// Author: <span class="keyword">${</span>author<span class="keyword">}</span>\n// Date: <span class="keyword">${</span>date<span class="keyword">}</span>\n\n`</span>;
+        <span class="keyword">const</span> current = ctx.editor.<span class="func">getText</span>();
+        ctx.editor.<span class="func">setText</span>(comment + current);
+      }
+    });
+  }
+});</code></pre>
+
+<h2 id="publishing">Publishing to Marketplace</h2>
+<p>To publish your plugin to the VSCode Android Marketplace:</p>
+
+<ol style="padding-left:20px; color:#ccc; line-height:2">
+  <li>Host your plugin JS file at a public URL (GitHub raw, CDN, etc.)</li>
+  <li>Go to <strong style="color:#4fc1ff">vscode-mobile-plugins.vercel.app</strong></li>
+  <li>Click <strong>Submit Plugin</strong> and fill in the form</li>
+  <li>Provide: name, description, author, category, and the raw JS URL</li>
+  <li>The maintainer reviews and approves your submission</li>
+  <li>Once approved, your plugin appears in the in-app Marketplace</li>
+</ol>
+
+<div class="warn">
+  <strong>Developer Mode:</strong> To test your plugin before publishing, enable <em>Developer Mode</em> in Settings. You can then paste your plugin JS directly into the local plugin loader and run it instantly without publishing.
+</div>
+
+<br><br>
+</body>
+</html>

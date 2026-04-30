@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>VScode Mobile Editor</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; background: #1e1e1e; overflow: hidden; }
+  #editor { width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<div id="editor"></div>
+<script src="monaco/vs/loader.js"></script>
+<script>
+require.config({ paths: { vs: 'monaco/vs' } });
+require(['vs/editor/editor.main'], function() {
+
+  window.editor = monaco.editor.create(document.getElementById('editor'), {
+    value: '',
+    language: 'plaintext',
+    theme: 'vs-dark',
+    fontSize: 14,
+    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    fontLigatures: true,
+    automaticLayout: true,
+    minimap: { enabled: false },
+    wordWrap: 'on',
+    lineNumbers: 'on',
+    renderLineHighlight: 'all',
+    scrollBeyondLastLine: false,
+    smoothScrolling: true,
+    cursorBlinking: 'smooth',
+    cursorSmoothCaretAnimation: 'on',
+    tabSize: 2,
+    insertSpaces: true,
+    formatOnPaste: true,
+    suggestOnTriggerCharacters: true,
+    quickSuggestions: true,
+    parameterHints: { enabled: true },
+    folding: true,
+    bracketPairColorization: { enabled: true },
+    guides: { bracketPairs: true, indentation: true },
+    padding: { top: 8, bottom: 8 },
+  });
+
+  const _workspaceFiles = new Map();
+  const _definitionCache = new Map();
+
+  function _setCurrentModelMeta(language, filename) {
+    const model = window.editor.getModel();
+    if (!model) return;
+    model._vscodeFilename = filename || '';
+    model._vscodeLanguage = language || 'plaintext';
+  }
+
+  function _buildDefinitionIndex(model) {
+    if (!model) return [];
+    const lines = model.getValue().split('\n');
+    const defs = [];
+    lines.forEach((line, i) => {
+      const patterns = [
+        /\bfunction\s+([A-Za-z_$][\w$]*)/,
+        /\bclass\s+([A-Za-z_$][\w$]*)/,
+        /\bdef\s+([A-Za-z_$][\w$]*)/,
+        /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:\(|function)/,
+        /\blet\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:\(|function)/,
+        /\bvar\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:\(|function)/,
+      ];
+      for (const re of patterns) {
+        const m = line.match(re);
+        if (m) defs.push({ name: m[1], line: i + 1, column: line.indexOf(m[1]) + 1 });
+      }
+    });
+    return defs;
+  }
+
+  function _refreshDefinitionCache() {
+    const model = window.editor.getModel();
+    if (!model) return;
+    const key = model.uri.toString();
+    _definitionCache.set(key, _buildDefinitionIndex(model));
+  }
+
+  function _findDefinition(name) {
+    const model = window.editor.getModel();
+    if (!model) return null;
+    const key = model.uri.toString();
+    const defs = _definitionCache.get(key) || _buildDefinitionIndex(model);
+    return defs.find(d => d.name === name) || null;
+  }
+
+  const _langs = ['javascript','typescript','python','kotlin','java','dart','go','rust','c','cpp','csharp','html','css','scss','json','yaml','markdown','shell','xml','php','ruby','swift','sql','r','lua','plaintext'];
+  _langs.forEach((lang) => {
+    monaco.languages.registerCompletionItemProvider(lang, {
+      triggerCharacters: ['.', ':', '_', '('],
+      provideCompletionItems: function(model, position) {
+        const word = model.getWordUntilPosition(position);
+        const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
+        const words = new Set();
+        const text = model.getValue();
+        text.match(/[A-Za-z_$][\w$]*/g)?.forEach(w => words.add(w));
+        const suggestions = Array.from(words).slice(0, 200).map(w => ({
+          label: w,
+          kind: monaco.languages.CompletionItemKind.Text,
+          insertText: w,
+          range,
+        }));
+        return { suggestions };
+      }
+    });
+
+    monaco.languages.registerDefinitionProvider(lang, {
+      provideDefinition: function(model, position) {
+        const word = model.getWordAtPosition(position);
+        if (!word) return [];
+        const def = _findDefinition(word.word);
+        if (!def) return [];
+        return [{
+          uri: model.uri,
+          range: new monaco.Range(def.line, def.column, def.line, def.column + word.word.length)
+        }];
+      }
+    });
+
+    monaco.languages.registerHoverProvider(lang, {
+      provideHover: function(model, position) {
+        const word = model.getWordAtPosition(position);
+        if (!word) return null;
+        const def = _findDefinition(word.word);
+        if (!def) return null;
+        return {
+          range: new monaco.Range(def.line, def.column, def.line, def.column + word.word.length),
+          contents: [{ value: `**${word.word}**\n\nDefined at line ${def.line}` }]
+        };
+      }
+    });
+
+    monaco.languages.registerRenameProvider(lang, {
+      provideRenameEdits: function(model, position, newName) {
+        const word = model.getWordAtPosition(position);
+        if (!word) throw new Error('Nothing to rename');
+        const matches = model.findMatches(`\\b${word.word}\\b`, true, false, true, null, true);
+        return {
+          edits: matches.map(m => ({ resource: model.uri, edit: { range: m.range, text: newName } })),
+          rejectReason: null
+        };
+      }
+    });
+  });
+
+  window.editor.onDidChangeModelContent(function() {
+    _refreshDefinitionCache();
+  });
+
+  _refreshDefinitionCache();
+  setTimeout(_refreshDefinitionCache, 0);
+
+  // Cursor position → Flutter
+  window.editor.onDidChangeCursorPosition(function(e) {
+    if (window.flutter_inappwebview) {
+      window.flutter_inappwebview.callHandler('onCursorChange',
+        e.position.lineNumber, e.position.column);
+    }
+  });
+
+  // Selection → Flutter
+  window.editor.onDidChangeCursorSelection(function(e) {
+    const sel = window.editor.getModel()?.getValueInRange(e.selection) ?? '';
+    if (window.flutter_inappwebview) {
+      window.flutter_inappwebview.callHandler('onSelectionChange', sel);
+    }
+  });
+
+  // Content change → Flutter
+  window.editor.onDidChangeModelContent(function() {
+    if (window.flutter_inappwebview) {
+      window.flutter_inappwebview.callHandler('onContentChange');
+    }
+  });
+
+  // ── Public API called from Flutter ──────────────────────────────────────
+
+  window.loadFile = function(content, language, filename) {
+    const model = monaco.editor.createModel(content, language);
+    model.uri = monaco.Uri.parse('file:///' + (filename || 'untitled'));
+    _setCurrentModelMeta(language, filename);
+    window.editor.setModel(model);
+    _refreshDefinitionCache();
+  };
+
+  window.runCommand = function(cmd) {
+    if (!cmd) return;
+    const selection = window.editor.getSelection();
+    const model = window.editor.getModel();
+    if (!model) return;
+    if (cmd === 'goToDefinition') {
+      const pos = window.editor.getPosition();
+      const word = model.getWordAtPosition(pos);
+      if (!word) return;
+      const def = _findDefinition(word.word);
+      if (def) window.editor.setPosition({ lineNumber: def.line, column: def.column });
+      return;
+    }
+    if (cmd === 'formatDocument') {
+      window.editor.getAction('editor.action.formatDocument')?.run();
+      return;
+    }
+    if (cmd === 'showQuickHelp') {
+      _toast(selection || 'No selection', false);
+    }
+  };
+
+  window.getWorkspaceSymbols = function() {
+    const model = window.editor.getModel();
+    return _buildDefinitionIndex(model);
+  };
+
+  window.applySettings = function(s) {
+    window.editor.updateOptions({
+      fontSize: s.fontSize || 14,
+      fontFamily: s.fontFamily ? `'${s.fontFamily}', monospace` : undefined,
+      tabSize: s.tabSize || 2,
+      wordWrap: s.wordWrap || 'on',
+    });
+  };
+
+  // ── Plugin System Runtime ────────────────────────────────────────────────
+
+  const _plugins = {};
+  const _hooks = { fileSave: [], fileOpen: [], editorReady: [] };
+  const _statusItems = [];
+
+  window.VscodePlugin = {
+    register(manifest) {
+      if (!manifest.id) return console.error('[Plugin] missing id');
+      const ctx = _buildCtx(manifest.id);
+      _plugins[manifest.id] = { manifest, ctx };
+      try {
+        manifest.activate(ctx);
+        console.log('[Plugin] loaded:', manifest.id);
+      } catch(e) {
+        console.error('[Plugin] error in', manifest.id, e);
+      }
+    }
+  };
+
+  function _buildCtx(pluginId) {
+    const prefix = 'plugin:' + pluginId + ':';
+    return {
+      editor: {
+        getValue: () => window.editor.getValue(),
+        setValue: (v) => window.editor.setValue(v),
+        getSelection: () => window.editor.getModel()?.getValueInRange(window.editor.getSelection()) ?? '',
+        replaceSelection: (text) => window.editor.executeEdits('plugin', [{
+          range: window.editor.getSelection(), text
+        }]),
+        getLanguage: () => window.editor.getModel()?.getLanguageId() ?? 'plaintext',
+        setLanguage: (lang) => monaco.editor.setModelLanguage(window.editor.getModel(), lang),
+        addCommand: (cmd) => {
+          if (cmd.keybinding && monaco.KeyCode[cmd.keybinding]) {
+            window.editor.addCommand(monaco.KeyCode[cmd.keybinding], cmd.run);
+          }
+        },
+        onDidChangeContent: (fn) => window.editor.onDidChangeModelContent(() => fn(window.editor.getValue())),
+      },
+      ui: {
+        showMessage: (text) => _toast(text, false),
+        showError: (text) => _toast(text, true),
+        addStatusBarItem: (item) => {
+          _statusItems.push(item);
+          if (window.flutter_inappwebview) {
+            window.flutter_inappwebview.callHandler('addStatusItem', item.id, item.text);
+          }
+        },
+      },
+      hooks: {
+        onFileSave: (fn) => _hooks.fileSave.push(fn),
+        onFileOpen: (fn) => _hooks.fileOpen.push(fn),
+        onEditorReady: (fn) => setTimeout(fn, 0),
+      },
+      storage: {
+        get: (k) => localStorage.getItem(prefix + k),
+        set: (k, v) => localStorage.setItem(prefix + k, v),
+        remove: (k) => localStorage.removeItem(prefix + k),
+      },
+      http: {
+        get: (url) => fetch(url).then(r => r.text()),
+        post: (url, body, headers = {}) => fetch(url, {
+          method: 'POST', body,
+          headers: { 'Content-Type': 'application/json', ...headers }
+        }).then(r => r.text()),
+      },
+    };
+  }
+
+  function _toast(msg, isError) {
+    const el = document.createElement('div');
+    el.textContent = msg;
+    Object.assign(el.style, {
+      position: 'fixed', bottom: '16px', left: '50%',
+      transform: 'translateX(-50%)',
+      background: isError ? '#5a1d1d' : '#252526',
+      color: isError ? '#f48771' : '#d4d4d4',
+      padding: '8px 16px', borderRadius: '4px',
+      fontSize: '13px', zIndex: '9999',
+      border: '1px solid ' + (isError ? '#f48771' : '#3c3c3c'),
+      pointerEvents: 'none',
+    });
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+  }
+
+  // Fire editorReady hooks
+  _hooks.editorReady.forEach(fn => { try { fn(); } catch(e) {} });
+});
+</script>
+</body>
+</html>

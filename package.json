@@ -1,0 +1,14 @@
+{
+  "name": "vscode-android-monaco",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build:monaco": "node scripts/bundle-monaco.js"
+  },
+  "dependencies": {
+    "monaco-editor": "0.47.0"
+  },
+  "devDependencies": {
+    "fs-extra": "^11.2.0"
+  }
+}

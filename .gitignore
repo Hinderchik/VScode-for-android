@@ -1,0 +1,32 @@
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+
+# Android
+android/.gradle/
+android/local.properties
+android/app/debug.keystore
+*.apk
+*.aab
+keystore.jks
+
+# Node
+node_modules/
+
+# Monaco (generated)
+assets/monaco/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Misc
+*.log
+pubspec.lock
+
+# Local planning notes
+SITE_TODO.txt
